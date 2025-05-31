@@ -4,7 +4,7 @@ import os
 
 # Add the parent directory to the sys.path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-from src.restpilot.main import RestClient
+from src.restpylot.main import RestClient
 
 class TestRestClient(unittest.TestCase):
     def setUp(self):

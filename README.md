@@ -1,4 +1,4 @@
-# restpilot Module
+# restpylot Module
 
 This module provides a `RestClient` class for making HTTP requests with ease. It is built on top of the `requests` library and provides methods for common HTTP operations such as GET, POST, PUT, DELETE, and PATCH.
 
@@ -12,20 +12,20 @@ This module provides a `RestClient` class for making HTTP requests with ease. It
 
 ## Installation
 
-To use the `restpilot` module:
+To use the `restpylot` module:
 
 ```bash
-pip install restpilot
+pip install restpylot
 ```
 
 ## Usage
 
 ### Initialization
 
-You can initialize the `restpilot` with a base URL, headers, authorization token, timeout, and debug mode.
+You can initialize the `restpylot` with a base URL, headers, authorization token, timeout, and debug mode.
 
 ```python
-from restpilot import RestClient
+from restpylot import RestClient
 
 client = RestClient(
     base_url='https://api.example.com',
@@ -38,7 +38,7 @@ client = RestClient(
 
 ### Making Requests
 
-The `restpilot` provides methods for making various types of HTTP requests.
+The `restpylot` provides methods for making various types of HTTP requests.
 
 #### GET Request
 
@@ -101,7 +101,7 @@ client.close()
 
 ## Logging
 
-If debug mode is enabled, the `restpilot` will log detailed information about the requests and responses.
+If debug mode is enabled, the `restpylot` will log detailed information about the requests and responses.
 
 ## License
 

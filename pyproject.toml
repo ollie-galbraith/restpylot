@@ -1,16 +1,16 @@
 [tool.poetry]
-name = "restpilot"
+name = "restpylot"
 version = "0.1.1"
 description = "A Python library for managing RESTful API interactions with a focus on security and ease of use."
 authors = ["Oliver Galbraith <olivergalbraith0@gmail.com>"]
 license = "GPL-3.0"
 readme = "README.md"
-homepage = "https://github.com/ollie-galbraith/restpilot"
-repository = "https://github.com/ollie-galbraith/restpilot"
-documentation = "https://github.com/ollie-galbraith/restpilot"
+homepage = "https://github.com/ollie-galbraith/restpylot"
+repository = "https://github.com/ollie-galbraith/restpylot"
+documentation = "https://github.com/ollie-galbraith/restpylot"
 
 packages = [
-    { include = "restpilot", from = "src" }
+    { include = "restpylot", from = "src" }
 ]
 
 [tool.poetry.dependencies]

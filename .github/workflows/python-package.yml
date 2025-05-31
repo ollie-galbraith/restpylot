@@ -1,0 +1,98 @@
+# This workflow will install Python dependencies, run tests and lint with a variety of Python versions
+# For more information see: https://docs.github.com/en/actions/automating-builds-and-tests/building-and-testing-python
+
+name: Python package
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.9", "3.10", "3.11"]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v3
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install build dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install flake8 pytest requests toml
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+
+      - name: Install module dependencies
+        run: |
+          DEPENDENCIES=$(python .github/workflows/get_dependencies.py)
+          if [ -n "$DEPENDENCIES" ]; then
+            echo "Installing dependencies: $DEPENDENCIES"
+            python -m pip install $DEPENDENCIES
+          else
+            echo "No dependencies found."
+          fi
+
+      - name: Lint with flake8
+        run: |
+          # stop the build if there are Python syntax errors or undefined names
+          flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+          # exit-zero treats all errors as warnings. The GitHub editor is 127 chars wide
+          flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+
+      - name: Test with pytest
+        run: |
+          pytest
+
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v3
+        with:
+          python-version: 3.11
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install poetry toml
+
+      - name: Get current version
+        id: get_version
+        run: |
+          echo "CURRENT_VERSION=$(python .github/workflows/get_version.py)" >> $GITHUB_ENV
+
+      - name: Get previous version
+        id: get_previous_version
+        run: |
+          PREVIOUS_VERSION=$(git tag --sort=-v:refname | head -n 1)
+          echo "PREVIOUS_VERSION=${PREVIOUS_VERSION#v}" >> $GITHUB_ENV
+
+      - name: Check version increment
+        if: ${{ steps.get_version.outputs.CURRENT_VERSION }} != ${{ steps.get_previous_version.outputs.PREVIOUS_VERSION }}
+        run: echo "Version has been incremented. Proceeding with publish."
+
+      - name: Build package
+        if: ${{ steps.get_version.outputs.CURRENT_VERSION }} != ${{ steps.get_previous_version.outputs.PREVIOUS_VERSION }}
+        run: |
+          poetry build
+
+      - name: Publish package
+        if: ${{ steps.get_version.outputs.CURRENT_VERSION }} != ${{ steps.get_previous_version.outputs.PREVIOUS_VERSION }}
+        env:
+          POETRY_PYPI_TOKEN_PYPI: ${{ secrets.PYPI_API_TOKEN }}
+        run: |
+          poetry publish --username __token__ --password $POETRY_PYPI_TOKEN_PYPI

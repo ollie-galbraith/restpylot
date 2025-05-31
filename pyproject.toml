@@ -1,0 +1,27 @@
+[tool.poetry]
+name = "restpilot"
+version = "0.1.1"
+description = "A Python library for managing RESTful API interactions with a focus on security and ease of use."
+authors = ["Oliver Galbraith <olivergalbraith0@gmail.com>"]
+license = "GPL-3.0"
+readme = "README.md"
+homepage = "https://github.com/ollie-galbraith/restpilot"
+repository = "https://github.com/ollie-galbraith/restpilot"
+documentation = "https://github.com/ollie-galbraith/restpilot"
+
+packages = [
+    { include = "restpilot", from = "src" }
+]
+
+[tool.poetry.dependencies]
+python = "^3.8"
+requests = "^2.31.0"
+acme = "^2.0.0"
+cryptography = "^39.0.1"
+
+[tool.poetry.group.devs.dependencies]
+pytest = "^6.2.4"
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"

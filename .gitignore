@@ -50,6 +50,7 @@ Thumbs.db
 
 # Python test files
 *test.py
+!unit_test.py
 
 # Python cache files
 __pycache__/

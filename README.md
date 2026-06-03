@@ -1,5 +1,7 @@
 # restpylot Module
 
+[![Python package](https://github.com/ollie-galbraith/restpylot/actions/workflows/python-package.yml/badge.svg)](https://github.com/ollie-galbraith/restpylot/actions/workflows/python-package.yml)
+
 This module provides a `RestClient` class for making HTTP requests with ease. It is built on top of the `requests` library and provides methods for common HTTP operations such as GET, POST, PUT, DELETE, and PATCH.
 
 ## Features

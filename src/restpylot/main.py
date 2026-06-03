@@ -1,31 +1,34 @@
 import os
 import logging
 import requests
-from typing import overload, Optional, Union
+from typing import overload, Optional
 from requests.auth import AuthBase
 
-class RestClient():
 
+class RestClient():
     @overload
     def __init__(self, base_url: Optional[str] = None, headers: Optional[dict] = None,
                  auth_token: str = ..., auth_token_type: str = 'Bearer',
                  api_key: None = None, api_key_type: str = 'APIKey',
                  auth: None = None,
-                 timeout: int = 10, debug: bool = False): ...
+                 timeout: int = 10, debug: bool = False):
+        ...
 
     @overload
     def __init__(self, base_url: Optional[str] = None, headers: Optional[dict] = None,
                  auth_token: None = None, auth_token_type: str = 'Bearer',
                  api_key: str = ..., api_key_type: str = 'APIKey',
                  auth: None = None,
-                 timeout: int = 10, debug: bool = False): ...
+                 timeout: int = 10, debug: bool = False):
+        ...
 
     @overload
     def __init__(self, base_url: Optional[str] = None, headers: Optional[dict] = None,
                  auth_token: None = None, auth_token_type: str = 'Bearer',
                  api_key: None = None, api_key_type: str = 'APIKey',
                  auth: dict = ...,
-                 timeout: int = 10, debug: bool = False): ...
+                 timeout: int = 10, debug: bool = False):
+        ...
 
     def __init__(self, base_url: Optional[str] = None, headers: Optional[dict] = None,
                  auth_token: Optional[str] = None, auth_token_type: str = 'Bearer',
@@ -38,7 +41,12 @@ class RestClient():
         :param base_url: Base URL for the API (e.g., "https://api.example.com")
         :param headers: Default headers (optional)
         :param auth_token: Authentication token (optional, for Bearer auth)
+        :param auth_token_type: Type of the authentication token (default: 'Bearer')
+        :param api_key: API key value (optional)
+        :param api_key_type: Header name for the API key (default: 'APIKey')
+        :param auth: Authentication credentials (optional, can be a requests.auth.AuthBase instance or a tuple for basic auth)
         :param timeout: Request timeout (default: 10s)
+        :param debug: Enable debug logging (default: False)
         """
 
         self.base_url = base_url.rstrip('/') if base_url else None
@@ -65,12 +73,14 @@ class RestClient():
         logging.basicConfig(level=log_level, format="%(asctime)s - %(levelname)s - %(message)s")
         self.logger.debug(f"Initialized RestClient with base URL: {self.base_url}")
 
-    def _request(self, method, endpoint, download_path=None, chunk_size=1024, **kwargs):
+    def _request(self, method: str, endpoint: str, download_path: str = None, chunk_size: int = 1024, **kwargs):
         """
         Internal method to make a REST API request.
 
         :param method: HTTP method (GET, POST, PUT, PATCH, DELETE)
         :param endpoint: API endpoint (e.g., "/users/1")
+        :param download_path: If provided, saves response content to this file path
+        :param chunk_size: Size of chunks to use when downloading files (default: 102
         :param kwargs: Additional request parameters (params, json, etc.)
         :return: Parsed JSON response or error message
         """
@@ -97,7 +107,7 @@ class RestClient():
             if response.content:
                 return response.json()
 
-        except requests.exceptions.HTTPError as e:
+        except requests.exceptions.HTTPError:
             # Extract detailed error message from response if available
             error_details = None
             try:
@@ -115,53 +125,94 @@ class RestClient():
         except requests.exceptions.Timeout:
             self.logger.error(f"Request timed out: {method} {url}")
             raise requests.exceptions.Timeout(f'Request to {url} timed out')
-            #return {"error": "Timeout", "message": f"Request to {url} timed out."}
 
         except requests.exceptions.ConnectionError as e:
             self.logger.error(f"Connection error: {method} {url} - {e}")
             raise requests.exceptions.ConnectionError(str(e))
-            #return {"error": "Connection Error", "message": str(e)}
 
         except requests.exceptions.RequestException as e:
             self.logger.error(f"Unexpected error: {method} {url} - {e}")
             raise requests.exceptions.RequestException(str(e))
-            #return {"error": "Request Exception", "message": str(e)}
 
-    def get(self, endpoint, params=None, download_path=None):
-        """Perform a GET request (used for retrieving data)."""
+    def get(self, endpoint: str, params: dict = None, download_path: str = None):
+        """
+        Perform a GET request (used for retrieving data).
+
+        :param endpoint: API endpoint (e.g., "/users/1")
+        :param params: Query parameters (optional)
+        :param download_path: If provided, saves response content to this file path (for file downloads)
+        :return: Parsed JSON response or path to downloaded file
+        """
         return self._request("GET", endpoint, params=params, download_path=download_path)
 
-    def post(self, endpoint, json=None):
-        """Perform a POST request (used for creating resources)."""
+    def post(self, endpoint: str, json: dict = None):
+        """
+        Perform a POST request (used for creating resources).
+
+        :param endpoint: API endpoint (e.g., "/users")
+        :param json: JSON data for the request body
+        :return: Parsed JSON response
+        """
         return self._request("POST", endpoint, json=json)
 
-    def put(self, endpoint, json=None):
-        """Perform a PUT request (used for updating resources)."""
+    def put(self, endpoint: str, json: dict = None):
+        """
+        Perform a PUT request (used for updating resources).
+
+        :param endpoint: API endpoint (e.g., "/users/1")
+        :param json: JSON data for the request body
+        :return: Parsed JSON response
+        """
         return self._request("PUT", endpoint, json=json)
 
-    def patch(self, endpoint, json=None):
-        """Perform a PATCH request (used for partial updates)."""
+    def patch(self, endpoint: str, json: dict = None):
+        """
+        Perform a PATCH request (used for partial updates).
+
+        :param endpoint: API endpoint (e.g., "/users/1")
+        :param json: JSON data for the request body
+        :return: Parsed JSON response
+        """
         return self._request("PATCH", endpoint, json=json)
 
-    def delete(self, endpoint):
-        """Perform a DELETE request (used for deleting resources)."""
+    def delete(self, endpoint: str):
+        """
+        Perform a DELETE request (used for deleting resources).
+
+        :param endpoint: API endpoint (e.g., "/users/1")
+        :return: Parsed JSON response
+        """
         return self._request("DELETE", endpoint)
 
-    def set_apikey_header(self, api_key, api_key_type='APIKey'):
-        """Update APIKey header"""
+    def set_apikey_header(self, api_key: str, api_key_type: str = 'APIKey'):
+        """
+        Update APIKey header
+
+        :param api_key: API key value
+        :param api_key_type: Header name for the API key (default: 'APIKey')
+        """
         self.session.headers.update({api_key_type: api_key})
         self.logger.debug("API Key set successfully")
 
-    def set_auth_token(self, auth_token, auth_token_type='Bearer'):
-        """Update authentication token."""
+    def set_auth_token(self, auth_token: str, auth_token_type: str = 'Bearer'):
+        """
+        Update authentication token.
+
+        :param auth_token: Authentication token value
+        :param auth_token_type: Type of the authentication token (default: 'Bearer')
+        """
         self.logger.debug(f"Auth Token '{auth_token_type}' added to session")
         self.session.headers.update({"Authorization": f"{auth_token_type} {auth_token}"})
 
-    def set_auth(self, auth):
-        """Update authentication method"""
+    def set_auth(self, auth: dict):
+        """
+        Update authentication method
+
+        :param auth: Authentication credentials
+        """
         if not isinstance(auth, (AuthBase, tuple)):
             raise TypeError(f"auth must be an instance of requests.auth.AuthBase or a tuple, got {type(auth).__name__}")
-        self.logger.debug(f"Authentication added to session")
+        self.logger.debug("Authentication added to session")
         self.session.auth = auth
 
     def close(self):

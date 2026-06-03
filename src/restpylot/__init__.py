@@ -1,1 +1,5 @@
-from .main import *
+from .main import RestClient
+
+__all__ = [
+    "RestClient"
+]

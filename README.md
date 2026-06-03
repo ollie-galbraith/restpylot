@@ -2,15 +2,19 @@
 
 [![Python package](https://github.com/ollie-galbraith/restpylot/actions/workflows/python-package.yml/badge.svg)](https://github.com/ollie-galbraith/restpylot/actions/workflows/python-package.yml)
 
-This module provides a `RestClient` class for making HTTP requests with ease. It is built on top of the `requests` library and provides methods for common HTTP operations such as GET, POST, PUT, DELETE, and PATCH.
+A lightweight, flexible REST API client built on the `requests` library. The `RestClient` class simplifies HTTP interactions with persistent session management for connection pooling, support for multiple authentication strategies, file operations, and comprehensive error handling—all wrapped in an intuitive, easy-to-use interface.
 
 ## Features
 
-- Supports GET, POST, PUT, DELETE, and PATCH requests.
-- Allows setting custom headers, including Authorization tokens and API keys.
-- Configurable timeout for requests.
-- Debug logging for request and response details.
-- Handles common HTTP errors and exceptions.
+- **HTTP Methods**: Supports GET, POST, PUT, DELETE, and PATCH requests.
+- **Multiple Authentication Methods**: Bearer token authentication, API key headers, and custom authentication (including HTTP Basic Auth via requests.auth.AuthBase).
+- **Dynamic Authentication Updates**: Set or update authentication credentials at runtime without reinitializing the client.
+- **File Downloads**: Stream and save file responses directly to disk with configurable chunk sizes.
+- **Session Management**: Leverages persistent HTTP sessions for connection pooling and performance optimization.
+- **Custom Headers**: Easily set default headers and customize them per request.
+- **Configurable Timeout**: Set request timeouts to handle slow or unresponsive APIs.
+- **Comprehensive Error Handling**: Graceful exception handling with detailed logging for HTTP errors, timeouts, and connection issues.
+- **Debug Logging**: Optional detailed logging for troubleshooting API interactions and request/response inspection.
 
 ## Installation
 

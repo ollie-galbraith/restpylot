@@ -8,6 +8,7 @@ import requests
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from src.restpylot.main import RestClient
 
+
 class TestRestClient(unittest.TestCase):
     def setUp(self):
         self.client = RestClient(base_url="https://jsonplaceholder.typicode.com")
@@ -95,6 +96,7 @@ class TestRestClient(unittest.TestCase):
         self.assertEqual(ctx.exception.response.status_code, 500)
         self.assertEqual(ctx.exception.response.text, '{"error": "bad request"}')
         self.assertEqual(ctx.exception.request.method, "GET")
+
 
 if __name__ == '__main__':
     unittest.main()

@@ -1,10 +1,11 @@
-import re
 import toml
+
 
 def get_dependecies():
     with open("pyproject.toml", "r") as f:
         pyproject = toml.load(f)
     return pyproject["tool"]["poetry"]["dependencies"]
+
 
 def convert_dependencies_to_string(dependencies):
     """Convert dependencies dictionary to a pip-compatible string."""
@@ -26,6 +27,7 @@ def convert_dependencies_to_string(dependencies):
         for key, value in dependencies.items()
         if isinstance(value, str) and not key.startswith("python")
     )
+
 
 if __name__ == "__main__":
     print(convert_dependencies_to_string(get_dependecies()))

@@ -107,20 +107,20 @@ class RestClient():
             if response.content:
                 return response.json()
 
-        except requests.exceptions.HTTPError:
-            # Extract detailed error message from response if available
+        except requests.exceptions.HTTPError as exc:
+            response = exc.response
             error_details = None
-            try:
-                error_details = response.json()  # Attempt to parse JSON error message
-            except ValueError:
-                error_details = response.text  # If not JSON, return raw text
+            if response is not None:
+                try:
+                    error_details = response.json()  # Attempt to parse JSON error message
+                except ValueError:
+                    error_details = response.text  # If not JSON, return raw text
 
-            self.logger.error(f"HTTPError {response.status_code} for {method} {url}: {error_details}")
-            raise requests.exceptions.HTTPError({
-                "status_code": response.status_code,
-                "message": error_details,
-                "url": url
-            })
+                self.logger.error(f"HTTPError {response.status_code} for {method} {url}: {error_details}")
+            else:
+                self.logger.error(f"HTTPError for {method} {url}: {exc}")
+
+            raise
 
         except requests.exceptions.Timeout:
             self.logger.error(f"Request timed out: {method} {url}")

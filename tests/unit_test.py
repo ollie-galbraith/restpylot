@@ -1,6 +1,8 @@
 import unittest
 import sys
 import os
+from unittest.mock import Mock
+import requests
 
 # Add the parent directory to the sys.path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
@@ -62,6 +64,37 @@ class TestRestClient(unittest.TestCase):
         self.assertEqual(response["title"], "foo")
         self.assertIn("userId", response)
         self.assertIn("body", response)
+
+    def test_http_error_preserves_response(self):
+        class DummyResponse(object):
+            def __init__(self):
+                self.status_code = 500
+                self._text = '{"error": "bad request"}'
+                self._json = {"error": "bad request"}
+
+            def raise_for_status(self):
+                raise requests.exceptions.HTTPError(
+                    "boom",
+                    response=self,
+                    request=requests.Request("GET", "https://example.test/bad").prepare(),
+                )
+
+            def json(self):
+                return self._json
+
+            @property
+            def text(self):
+                return self._text
+
+        response = DummyResponse()
+        self.client.session.request = Mock(return_value=response)
+
+        with self.assertRaises(requests.exceptions.HTTPError) as ctx:
+            self.client.get("bad")
+
+        self.assertEqual(ctx.exception.response.status_code, 500)
+        self.assertEqual(ctx.exception.response.text, '{"error": "bad request"}')
+        self.assertEqual(ctx.exception.request.method, "GET")
 
 if __name__ == '__main__':
     unittest.main()

@@ -9,15 +9,13 @@ on:
       - main
     paths:
       - pyproject.toml
-      - .gitea/workflows/python-package.yml
+      - .github/workflows/python-package.yml
   pull_request:
     branches:
       - "main"
 
 jobs:
   build:
-    env:
-      RUNNER_TOOL_CACHE: /toolcache # Runner Tool Cache
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -31,27 +29,19 @@ jobs:
           fetch-depth: 0
 
       - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: ${{ matrix.python-version }}
-
-      - name: Create and Activate Virtual Environment
-        run: |
-          python -m venv .venv
-          echo "VIRTUAL_ENV=${{ github.workspace }}/.venv" >> $GITHUB_ENV
-          echo "${{ github.workspace }}/.venv/bin" >> $GITHUB_PATH
 
       - name: Install build dependencies
         run: |
           python -m pip install --upgrade pip
           python -m pip install flake8 pytest requests toml
-          if [ -f requirements.txt ]; then
-              pip install -r requirements.txt
-          fi
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
 
       - name: Install module dependencies
         run: |
-          DEPENDENCIES=$(python .gitea/workflows/get_dependencies.py)
+          DEPENDENCIES=$(python .github/workflows/get_dependencies.py)
           if [ -n "$DEPENDENCIES" ]; then
             echo "Installing dependencies: $DEPENDENCIES"
             python -m pip install $DEPENDENCIES
@@ -79,16 +69,10 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Set up Python 3.14
+      - name: Set up Python 3.12
         uses: actions/setup-python@v6
         with:
-          python-version: 3.14
-
-      - name: Create and Activate Virtual Environment
-        run: |
-          python -m venv .venv
-          echo "VIRTUAL_ENV=${{ github.workspace }}/.venv" >> $GITHUB_ENV
-          echo "${{ github.workspace }}/.venv/bin" >> $GITHUB_PATH
+          python-version: 3.12
 
       - name: Install dependencies
         run: |
@@ -98,7 +82,7 @@ jobs:
       - name: Get current version
         id: get_version
         run: |
-          CURRENT_VERSION=$(python .gitea/workflows/get_version.py)
+          CURRENT_VERSION=$(python .github/workflows/get_version.py)
           CURRENT_VERSION=${CURRENT_VERSION#v}
           echo "CURRENT_VERSION=$CURRENT_VERSION"
           echo "version=$CURRENT_VERSION" >> "$GITHUB_OUTPUT"
@@ -110,7 +94,7 @@ jobs:
           if git rev-parse --verify HEAD~1 >/dev/null 2>&1; then
             git show HEAD~1:pyproject.toml > /tmp/previous-pyproject.toml 2>/dev/null || true
             if [ -f /tmp/previous-pyproject.toml ]; then
-              PREVIOUS_VERSION=$(python .gitea/workflows/get_version.py /tmp/previous-pyproject.toml)
+              PREVIOUS_VERSION=$(python .github/workflows/get_version.py /tmp/previous-pyproject.toml)
             fi
           fi
           echo "PREVIOUS_VERSION=$PREVIOUS_VERSION"

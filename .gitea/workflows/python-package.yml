@@ -108,7 +108,7 @@ jobs:
           if git rev-parse --verify HEAD~1 >/dev/null 2>&1; then
             git show HEAD~1:pyproject.toml > /tmp/previous-pyproject.toml 2>/dev/null || true
             if [ -f /tmp/previous-pyproject.toml ]; then
-              PREVIOUS_VERSION=$(python .github/workflows/get_version.py /tmp/previous-pyproject.toml)
+              PREVIOUS_VERSION=$(python .gitea/workflows/get_version.py /tmp/previous-pyproject.toml)
             fi
           fi
           echo "PREVIOUS_VERSION=$PREVIOUS_VERSION"

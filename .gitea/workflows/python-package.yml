@@ -16,6 +16,8 @@ on:
 
 jobs:
   build:
+    env:
+      RUNNER_TOOL_CACHE: /toolcache # Runner Tool Cache
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false

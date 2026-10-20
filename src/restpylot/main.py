@@ -151,6 +151,7 @@ class RestClient():
         :param endpoint: API endpoint (e.g., "/users/1")
         :param params: Query parameters (optional)
         :param download_path: If provided, saves response content to this file path (for file downloads)
+        :param headers: If provided, sets the headers for this specific request, instead of session headers
         :return: Parsed JSON response or path to downloaded file
         """
         kwargs = {}
@@ -166,6 +167,8 @@ class RestClient():
 
         :param endpoint: API endpoint (e.g., "/users")
         :param json: JSON data for the request body
+        :param data: x-www-form-urlencoded data for the request body
+        :param headers: If provided, sets the headers for this specific request, instead of session headers
         :return: Parsed JSON response
         """
 
@@ -189,6 +192,8 @@ class RestClient():
 
         :param endpoint: API endpoint (e.g., "/users/1")
         :param json: JSON data for the request body
+        :param data: x-www-form-urlencoded data for the request body
+        :param headers: If provided, sets the headers for this specific request, instead of session headers
         :return: Parsed JSON response
         """
 
@@ -212,6 +217,8 @@ class RestClient():
 
         :param endpoint: API endpoint (e.g., "/users/1")
         :param json: JSON data for the request body
+        :param data: x-www-form-urlencoded data for the request body
+        :param headers: If provided, sets the headers for this specific request, instead of session headers
         :return: Parsed JSON response
         """
 
@@ -233,6 +240,7 @@ class RestClient():
         Perform a DELETE request (used for deleting resources).
 
         :param endpoint: API endpoint (e.g., "/users/1")
+        :param headers: If provided, sets the headers for this specific request, instead of session headers
         :return: Parsed JSON response
         """
         if headers is not None:

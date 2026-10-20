@@ -10,8 +10,9 @@ A lightweight, flexible REST API client built on the `requests` library. The `Re
 - **Multiple Authentication Methods**: Bearer token authentication, API key headers, and custom authentication (including HTTP Basic Auth via requests.auth.AuthBase).
 - **Dynamic Authentication Updates**: Set or update authentication credentials at runtime without reinitializing the client.
 - **File Downloads**: Stream and save file responses directly to disk with configurable chunk sizes.
+- **Response Cleanup**: Close each response after processing, including streamed downloads; use the client as a context manager to close its session automatically.
 - **Session Management**: Leverages persistent HTTP sessions for connection pooling and performance optimization.
-- **Custom Headers**: Easily set default headers and customize them per request.
+- **Custom Headers**: Set session-wide defaults or provide headers for an individual request without changing session defaults.
 - **Configurable Timeout**: Set request timeouts to handle slow or unresponsive APIs.
 - **Comprehensive Error Handling**: Graceful exception handling with detailed logging for HTTP errors, timeouts, and connection issues.
 - **Debug Logging**: Optional detailed logging for troubleshooting API interactions and request/response inspection.
@@ -53,11 +54,23 @@ response = client.get('/endpoint', params={'key': 'value'})
 print(response)
 ```
 
+All request methods accept an optional `headers` argument. These headers apply only to that request, override matching session headers, and leave other session defaults in place.
+
+```python
+response = client.get('/endpoint', headers={'X-Request-ID': 'one-off'})
+```
+
 #### POST Request
 
 ```python
 response = client.post('/endpoint', json={'key': 'value'})
 print(response)
+```
+
+Use `data` instead of `json` to send form-encoded data. A request cannot specify both.
+
+```python
+response = client.post('/endpoint', data={'key': 'value'})
 ```
 
 #### PUT Request
@@ -94,12 +107,19 @@ client.set_auth_token('new_auth_token')
 You can set an API key with a custom header.
 
 ```python
-client.set_api_key('your_api_key', header='X-Api-Key')
+client.set_apikey_header('your_api_key', api_key_type='X-Api-Key')
 ```
 
-### Closing the Session
+### Session Cleanup
 
-It is a good practice to close the session when you are done with the client.
+Use the client as a context manager to close the session automatically when the block exits, including when an exception is raised.
+
+```python
+with RestClient(base_url='https://api.example.com') as client:
+    response = client.get('/endpoint')
+```
+
+You can also close the session explicitly:
 
 ```python
 client.close()

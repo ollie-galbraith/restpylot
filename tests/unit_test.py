@@ -13,6 +13,120 @@ class TestRestClient(unittest.TestCase):
     def setUp(self):
         self.client = RestClient(base_url="https://jsonplaceholder.typicode.com")
 
+    def test_context_manager_closes_session(self):
+        self.client.session.close = Mock()
+
+        with self.client as client:
+            self.assertIs(client, self.client)
+
+        self.client.session.close.assert_called_once_with()
+
+    def test_context_manager_closes_session_when_exception_is_raised(self):
+        self.client.session.close = Mock()
+
+        with self.assertRaisesRegex(RuntimeError, "request failed"):
+            with self.client:
+                raise RuntimeError("request failed")
+
+        self.client.session.close.assert_called_once_with()
+
+    def test_update_headers_preserves_other_headers(self):
+        self.client.update_headers({"X-Custom": "value"})
+
+        self.assertEqual(self.client.session.headers["X-Custom"], "value")
+        self.assertEqual(self.client.session.headers["Accept"], "application/json")
+
+    def test_set_headers_replaces_existing_headers(self):
+        self.client.set_headers({"X-Custom": "value"})
+
+        self.assertEqual(dict(self.client.session.headers), {"X-Custom": "value"})
+
+    def test_remove_headers_removes_only_matching_headers(self):
+        self.client.update_headers({"X-Remove": "remove", "X-Keep": "keep"})
+
+        self.client.remove_headers({"x-remove": None})
+
+        self.assertNotIn("X-Remove", self.client.session.headers)
+        self.assertEqual(self.client.session.headers["X-Keep"], "keep")
+
+    def test_clear_headers_removes_all_headers(self):
+        self.client.clear_headers()
+
+        self.assertEqual(len(self.client.session.headers), 0)
+
+    def test_set_apikey_header(self):
+        self.client.set_apikey_header("secret", "X-API-Key")
+
+        self.assertEqual(self.client.session.headers["X-API-Key"], "secret")
+
+    def test_set_auth_token(self):
+        self.client.set_auth_token("secret", "Token")
+
+        self.assertEqual(self.client.session.headers["Authorization"], "Token secret")
+
+    def test_http_methods_accept_per_request_headers(self):
+        headers = {"X-Request-ID": "one-off"}
+        cases = [
+            ("get", "GET", "posts", {"params": None, "download_path": None}),
+            ("post", "POST", "posts", {}),
+            ("put", "PUT", "posts/1", {}),
+            ("patch", "PATCH", "posts/1", {}),
+            ("delete", "DELETE", "posts/1", {}),
+        ]
+
+        for method_name, http_method, endpoint, kwargs in cases:
+            with self.subTest(method=method_name):
+                self.client._request = Mock()
+
+                getattr(self.client, method_name)(endpoint, headers=headers)
+
+                self.client._request.assert_called_once_with(
+                    http_method, endpoint, headers=headers, **kwargs
+                )
+
+    def test_per_request_headers_do_not_mutate_session_headers(self):
+        headers = {"X-Request-ID": "one-off"}
+        response = requests.Response()
+        response.status_code = 200
+        response._content = b""
+        self.client.session.request = Mock(return_value=response)
+
+        self.client.get("posts", headers=headers)
+
+        self.client.session.request.assert_called_once_with(
+            "GET",
+            "https://jsonplaceholder.typicode.com/posts",
+            timeout=10,
+            stream=True,
+            params=None,
+            headers=headers,
+        )
+        self.assertNotIn("X-Request-ID", self.client.session.headers)
+
+    def test_post_with_data(self):
+        data = {"title": "foo"}
+        self.client._request = Mock(return_value={})
+
+        self.client.post("posts", data=data)
+
+        self.client._request.assert_called_once_with("POST", "posts", data=data)
+
+    def test_put_with_data(self):
+        data = {"title": "foo"}
+        self.client._request = Mock(return_value={})
+
+        self.client.put("posts/1", data=data)
+
+        self.client._request.assert_called_once_with("PUT", "posts/1", data=data)
+
+    def test_patch_with_data(self):
+        data = {"title": "foo"}
+        self.client._request = Mock(return_value={})
+
+        self.client.patch("posts/1", data=data)
+
+        self.client._request.assert_called_once_with("PATCH", "posts/1", data=data)
+
     def test_get_posts(self):
         response = self.client.get("posts")
         self.assertIsInstance(response, list)
@@ -72,6 +186,14 @@ class TestRestClient(unittest.TestCase):
                 self.status_code = 500
                 self._text = '{"error": "bad request"}'
                 self._json = {"error": "bad request"}
+                self.closed = False
+                self.body_read_before_close = False
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, exc_type, exc_value, traceback):
+                self.closed = True
 
             def raise_for_status(self):
                 raise requests.exceptions.HTTPError(
@@ -81,10 +203,15 @@ class TestRestClient(unittest.TestCase):
                 )
 
             def json(self):
+                if self.closed:
+                    raise RuntimeError("response body read after close")
+                self.body_read_before_close = True
                 return self._json
 
             @property
             def text(self):
+                if self.closed and not self.body_read_before_close:
+                    raise RuntimeError("response body read after close")
                 return self._text
 
         response = DummyResponse()
@@ -96,6 +223,8 @@ class TestRestClient(unittest.TestCase):
         self.assertEqual(ctx.exception.response.status_code, 500)
         self.assertEqual(ctx.exception.response.text, '{"error": "bad request"}')
         self.assertEqual(ctx.exception.request.method, "GET")
+        self.assertTrue(response.closed)
+        self.assertTrue(response.body_read_before_close)
 
 
 if __name__ == '__main__':

@@ -1,60 +1,80 @@
-import os
 import logging
+import os
 import requests
+import tempfile
+import time
+
 from typing import overload, Optional
-from requests.auth import AuthBase
+from http.cookiejar import MozillaCookieJar
+from platformdirs import user_cache_dir
+from pathlib import Path
+from urllib.parse import urlsplit
 
 
 class RestClient():
     @overload
-    def __init__(self, base_url: Optional[str] = None, headers: Optional[dict] = None,
-                 auth_token: str = ..., auth_token_type: str = 'Bearer',
-                 api_key: None = None, api_key_type: str = 'APIKey',
-                 auth: None = None,
-                 timeout: int = 10, debug: bool = False) -> None:
+    def __init__(auth_token: str, api_key: None = None, auth: None = None) -> None:
         ...
 
     @overload
-    def __init__(self, base_url: Optional[str] = None, headers: Optional[dict] = None,
-                 auth_token: None = None, auth_token_type: str = 'Bearer',
-                 api_key: str = ..., api_key_type: str = 'APIKey',
-                 auth: None = None,
-                 timeout: int = 10, debug: bool = False) -> None:
+    def __init__(api_key: str, auth_token: None = None, auth: None = None) -> None:
         ...
 
     @overload
-    def __init__(self, base_url: Optional[str] = None, headers: Optional[dict] = None,
-                 auth_token: None = None, auth_token_type: str = 'Bearer',
-                 api_key: None = None, api_key_type: str = 'APIKey',
-                 auth: dict = ...,
-                 timeout: int = 10, debug: bool = False) -> None:
+    def __init__(auth: dict, auth_token: None = None, api_key: None = None) -> None:
         ...
 
-    def __init__(self, base_url: Optional[str] = None, headers: Optional[dict] = None,
-                 auth_token: Optional[str] = None, auth_token_type: str = 'Bearer',
-                 api_key: Optional[str] = None, api_key_type: str = 'APIKey',
-                 auth: Optional[dict] = None,
-                 timeout: int = 10, debug: bool = False) -> None:
+    def __init__(
+        self, base_url: str, headers: dict = None,
+        auth_token: str = None, auth_token_type: str = 'Bearer',
+        api_key: str = None, api_key_type: str = 'APIKey',
+        auth=None, app_name: str = 'rest_client',
+        validate_certs: bool = True, timeout: int = 10, debug: bool = False
+    ) -> None:
         """
         Initialize the RestClient for REST API requests.
 
         :param base_url: Base URL for the API (e.g., "https://api.example.com")
         :param headers: Default headers (optional)
         :param auth_token: Authentication token (optional, for Bearer auth)
-        :param auth_token_type: Type of the authentication token (default: 'Bearer')
+        :param auth_token_type: Type of the authentication token
         :param api_key: API key value (optional)
-        :param api_key_type: Header name for the API key (default: 'APIKey')
+        :param api_key_type: Header name for the API key
         :param auth: Authentication credentials (optional, can be a requests.auth.AuthBase instance or a tuple for basic auth)
+        :param validate_certs: Validate SSL certificates or not
         :param timeout: Request timeout (default: 10s)
         :param debug: Enable debug logging (default: False)
         """
 
         self.base_url = base_url.rstrip('/') if base_url else None
+
+        self.logger = logging.getLogger(__name__)
+        self.log_level = logging.DEBUG if debug else logging.WARNING
+        logging.basicConfig(level=self.log_level, format="%(asctime)s - %(levelname)s - %(message)s")
+        self.logger.debug(f"Initialized RestClient with base URL: {self.base_url}")
+
         self.session = requests.Session()
+
+        if validate_certs is False:
+            import urllib3
+            urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+            self.session.verify = validate_certs
+
         self.session.headers.update(headers or {
             'Content-Type': 'application/json',
-            'Accept': 'application/json'
+            'Accept': 'application/json, text/plain'
         })
+
+        # Initialise cookie storage
+        self.cookie_dir = Path(user_cache_dir(app_name))
+        self.cookie_dir.mkdir(parents=True, exist_ok=True, mode=0o700)
+        if os.name == 'posix':
+            self.cookie_dir.chmod(0o700)
+        self.cookie_file = self.cookie_dir / "cookies.txt"
+
+        # Attach cookie jar
+        self.session.cookies = MozillaCookieJar(str(self.cookie_file))
+
         if auth_token:
             self.session.headers.update({'Authorization': f'{auth_token_type} {auth_token}'})
 
@@ -62,16 +82,11 @@ class RestClient():
             self.session.headers.update({api_key_type: api_key})
 
         if auth:
-            if not isinstance(auth, (AuthBase, tuple)):
+            if not isinstance(auth, (requests.auth.AuthBase, tuple)):
                 raise TypeError(f"auth must be an instance of requests.auth.AuthBase or a tuple, got {type(auth).__name__}")
             self.session.auth = auth
 
         self.timeout = timeout
-
-        self.logger = logging.getLogger(__name__)
-        log_level = logging.DEBUG if debug else logging.WARNING
-        logging.basicConfig(level=log_level, format="%(asctime)s - %(levelname)s - %(message)s")
-        self.logger.debug(f"Initialized RestClient with base URL: {self.base_url}")
 
     @property
     def get_headers(self, header: Optional[str] = None):
@@ -247,6 +262,132 @@ class RestClient():
             return self._request("DELETE", endpoint, headers=headers)
         return self._request("DELETE", endpoint)
 
+    def save_cookies(self) -> None:
+        """Save current session cookies to disk."""
+        fd, temp_name = tempfile.mkstemp(
+            prefix=".cookies-", suffix=".tmp", dir=self.cookie_dir
+        )
+        temp_path = Path(temp_name)
+        try:
+            os.close(fd)
+            temp_jar = MozillaCookieJar(str(temp_path))
+            for cookie in self.session.cookies:
+                temp_jar.set_cookie(cookie)
+            temp_jar.save(ignore_discard=True, ignore_expires=False)
+            if os.name == 'posix':
+                temp_path.chmod(0o600)
+            os.replace(temp_path, self.cookie_file)
+            self.logger.debug(f"Cookies saved to {self.cookie_file}")
+        except Exception:
+            self.logger.exception("Failed to save cookies")
+            raise
+        finally:
+            try:
+                temp_path.unlink()
+            except FileNotFoundError:
+                pass
+
+    def load_cookies(self) -> None:
+        """Load cookies from disk into the session."""
+        if self.cookie_file.exists():
+            try:
+                self.session.cookies.load(ignore_discard=True, ignore_expires=False)
+                self.logger.debug(f"Cookies loaded from {self.cookie_file}")
+            except Exception:
+                self.logger.exception("Failed to load cookies")
+                raise
+        else:
+            self.logger.debug(f"No cookie file found at {self.cookie_file}")
+
+    def format_cookie(
+        self, name: str, value: str, ttl: Optional[int] = None,
+        domain: str = None, path: str = '/', secure: Optional[bool] = None
+    ):
+        """Create a cookie object suitable for the session cookie jar.
+
+        :param name: Cookie name
+        :param value: Cookie value
+        :param ttl: Cookie lifetime in seconds; None creates a session cookie
+        :param domain: Cookie domain; defaults to the base URL's host only
+        :param path: Request path the cookie applies to
+        :param secure: Restrict transmission to HTTPS; defaults from the base URL
+        """
+        name_chars = "!#$%&'*+-.^_`|~"
+        if not isinstance(name, str) or not name or any(
+            not (char.isascii() and (char.isalnum() or char in name_chars))
+            for char in name
+        ):
+            raise ValueError("Cookie name contains invalid characters")
+        if not isinstance(value, str) or any(
+            not value_char.isascii()
+            or not (
+                ord(value_char) == 0x21
+                or 0x23 <= ord(value_char) <= 0x2B
+                or 0x2D <= ord(value_char) <= 0x3A
+                or 0x3C <= ord(value_char) <= 0x5B
+                or 0x5D <= ord(value_char) <= 0x7E
+            )
+            for value_char in value
+        ):
+            raise ValueError("Cookie value contains characters not permitted by the cookie format")
+        if ttl is not None:
+            if not isinstance(ttl, int) or isinstance(ttl, bool):
+                raise TypeError("ttl must be an integer number of seconds or None")
+            if ttl <= 0:
+                raise ValueError("ttl must be greater than zero")
+
+        base_url = urlsplit(self.base_url or '')
+        cookie_domain = domain or base_url.hostname
+        if not cookie_domain:
+            raise ValueError("A cookie domain is required when base_url has no hostname")
+        if not isinstance(cookie_domain, str) or any(
+            not char.isascii() or ord(char) < 0x21 or ord(char) == 0x7f
+            for char in cookie_domain
+        ):
+            raise ValueError("Cookie domain contains invalid characters")
+        if not isinstance(path, str) or not path.startswith('/') or any(
+            not char.isascii() or ord(char) < 0x20 or ord(char) == 0x7f
+            for char in path
+        ):
+            raise ValueError("Cookie path must be an absolute path without control characters")
+        if secure is not None and not isinstance(secure, bool):
+            raise TypeError("secure must be a bool or None")
+        if secure is None:
+            secure = base_url.scheme.lower() == 'https'
+
+        cookie = requests.cookies.create_cookie(
+            name=name,
+            value=value,
+            domain=cookie_domain,
+            path=path,
+            secure=secure,
+            expires=int(time.time()) + ttl if ttl is not None else None,
+        )
+        return cookie
+
+    def set_cookie(
+        self, name: str, value: str, ttl: Optional[int] = None,
+        domain: str = None, path: str = '/', secure: Optional[bool] = None
+    ) -> None:
+        """Add a cookie to the session, optionally with a TTL."""
+        self.session.cookies.set_cookie(
+            self.format_cookie(name, value, ttl, domain, path, secure)
+        )
+
+    def has_valid_cookies(self, domain: str = None) -> bool:
+        now = time.time()
+        requested_domain = domain.lstrip('.').rstrip('.').lower() if domain else None
+        for cookie in self.session.cookies:
+            cookie_domain = cookie.domain.lstrip('.').rstrip('.').lower()
+            if requested_domain and not (
+                cookie_domain == requested_domain
+                or cookie_domain.endswith(f".{requested_domain}")
+            ):
+                continue
+            if cookie.expires is None or cookie.expires > now:
+                return True
+        return False
+
     def set_apikey_header(self, api_key: str, api_key_type: str = 'APIKey') -> None:
         """
         Update APIKey header
@@ -273,7 +414,7 @@ class RestClient():
 
         :param auth: Authentication credentials
         """
-        if not isinstance(auth, (AuthBase, tuple)):
+        if not isinstance(auth, (requests.auth.AuthBase, tuple)):
             raise TypeError(f"auth must be an instance of requests.auth.AuthBase or a tuple, got {type(auth).__name__}")
         self.logger.debug("Authentication added to session")
         self.session.auth = auth

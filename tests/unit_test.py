@@ -1,7 +1,10 @@
 import unittest
 import sys
 import os
+import tempfile
+import time
 from unittest.mock import Mock
+from unittest.mock import patch
 import requests
 
 # Add the parent directory to the sys.path
@@ -63,6 +66,74 @@ class TestRestClient(unittest.TestCase):
         self.client.set_auth_token("secret", "Token")
 
         self.assertEqual(self.client.session.headers["Authorization"], "Token secret")
+
+    def test_cookie_save_and_load_uses_private_file(self):
+        with tempfile.TemporaryDirectory() as cookie_directory:
+            with patch("src.restpylot.main.user_cache_dir", return_value=cookie_directory):
+                client = RestClient(base_url="https://example.com")
+                client.set_cookie("access_token", "secret-token", ttl=3600)
+                cookie = next(iter(client.session.cookies))
+                self.assertEqual(cookie.name, "access_token")
+                self.assertGreater(cookie.expires, int(time.time()))
+                self.assertTrue(cookie.secure)
+                client.save_cookies()
+
+                self.assertTrue(client.cookie_file.exists())
+                if os.name == "posix":
+                    self.assertEqual(client.cookie_file.stat().st_mode & 0o777, 0o600)
+                    self.assertEqual(client.cookie_dir.stat().st_mode & 0o777, 0o700)
+
+                restored_client = RestClient(base_url="https://example.com")
+                restored_client.load_cookies()
+                restored_cookie = next(
+                    cookie for cookie in restored_client.session.cookies
+                    if cookie.name == "access_token"
+                )
+                self.assertEqual(restored_cookie.value, "secret-token")
+
+                matching_request = restored_client.session.prepare_request(
+                    requests.Request("GET", "https://example.com/resource")
+                )
+                subdomain_request = restored_client.session.prepare_request(
+                    requests.Request("GET", "https://sub.example.com/resource")
+                )
+                unrelated_request = restored_client.session.prepare_request(
+                    requests.Request("GET", "https://other.test/resource")
+                )
+                self.assertEqual(matching_request.headers["Cookie"], "access_token=secret-token")
+                self.assertEqual(subdomain_request.headers["Cookie"], "access_token=secret-token")
+                self.assertNotIn("Cookie", unrelated_request.headers)
+
+    def test_format_cookie_rejects_invalid_values_and_ttls(self):
+        with self.assertRaises(ValueError):
+            self.client.format_cookie("token", "contains spaces")
+
+        with self.assertRaises(ValueError):
+            self.client.format_cookie("token", "value", ttl=0)
+
+        with self.assertRaises(TypeError):
+            self.client.format_cookie("token", "value", ttl=1.5)
+
+    def test_has_valid_cookies_ignores_expired_cookies_if_valid_ones_exist(self):
+        self.client.session.cookies.set_cookie(
+            requests.cookies.create_cookie(
+                "expired", "old", domain="example.com", expires=int(time.time()) - 10
+            )
+        )
+        self.client.session.cookies.set_cookie(
+            requests.cookies.create_cookie(
+                "valid", "current", domain="example.com", expires=int(time.time()) + 3600
+            )
+        )
+
+        self.assertTrue(self.client.has_valid_cookies("example.com"))
+
+    def test_has_valid_cookies_requires_domain_boundary(self):
+        self.client.session.cookies.set_cookie(
+            requests.cookies.create_cookie("session", "secret", domain="notexample.com")
+        )
+
+        self.assertFalse(self.client.has_valid_cookies("example.com"))
 
     def test_http_methods_accept_per_request_headers(self):
         headers = {"X-Request-ID": "one-off"}

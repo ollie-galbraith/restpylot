@@ -125,6 +125,19 @@ You can also close the session explicitly:
 client.close()
 ```
 
+### Cookie Persistence
+
+Cookies are not loaded automatically. Load them only for workflows that need them, then save them explicitly when you want to persist the session. Cookie files are stored in the platform's user cache directory. You can also add application-provided tokens to the jar with a TTL; the default cookie domain is the host in `base_url`, and requests sends domain cookies to its subdomains as well. Pass `domain` explicitly to control the cookie's domain scope.
+
+```python
+client.load_cookies()
+client.set_cookie('access_token', 'token-value', ttl=3600)
+response = client.get('/endpoint')
+client.save_cookies()
+```
+
+`format_cookie()` creates a cookie object without adding it to the session; `set_cookie()` creates and adds it. Cookie names and values must follow cookie syntax. Closing the client does not save cookies automatically. Cookie load and save errors are raised to the caller.
+
 ## Logging
 
 If debug mode is enabled, the `restpylot` will log detailed information about the requests and responses.

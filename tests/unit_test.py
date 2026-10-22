@@ -37,7 +37,7 @@ class TestRestClient(unittest.TestCase):
         self.client.update_headers({"X-Custom": "value"})
 
         self.assertEqual(self.client.session.headers["X-Custom"], "value")
-        self.assertEqual(self.client.session.headers["Accept"], "application/json")
+        self.assertEqual(self.client.session.headers["Accept"], "application/json, text/plain")
 
     def test_set_headers_replaces_existing_headers(self):
         self.client.set_headers({"X-Custom": "value"})

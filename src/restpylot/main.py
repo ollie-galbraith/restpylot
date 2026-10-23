@@ -23,7 +23,7 @@ def _redact_for_logging(value, key=None):
         or normalized_key.endswith('key')
     )
     if sensitive_key:
-        return '*' * len(value)
+        return '[REDACTED]'
     if isinstance(value, Mapping):
         return {nested_key: _redact_for_logging(nested_value, nested_key)
                 for nested_key, nested_value in value.items()}
@@ -36,7 +36,7 @@ def _redact_for_logging(value, key=None):
                 redacted_values.append(_redact_for_logging(item))
         return type(value)(redacted_values)
     if normalized_key in {'data', 'json', 'params'} and isinstance(value, (str, bytes)):
-        return '*' * len(value)
+        return '[REDACTED]'
     return value
 
 

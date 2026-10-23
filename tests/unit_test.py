@@ -174,6 +174,30 @@ class TestRestClient(unittest.TestCase):
         )
         self.assertNotIn("X-Request-ID", self.client.session.headers)
 
+    def test_request_debug_log_redacts_secrets_without_changing_request_kwargs(self):
+        self.client.logger.setLevel("DEBUG")
+        self.client.session.request = Mock(side_effect=requests.exceptions.ConnectionError("offline"))
+        headers = {"Authorization": "Bearer header-secret", "X-Request-ID": "request-123"}
+        request_json = {"refresh_token": "body-secret", "title": "visible"}
+
+        with self.assertLogs(self.client.logger, level="DEBUG") as captured_logs:
+            with self.assertRaises(requests.exceptions.ConnectionError):
+                self.client._request("POST", "items", headers=headers, json=request_json)
+
+        logged_output = "\n".join(captured_logs.output)
+        self.assertNotIn("header-secret", logged_output)
+        self.assertNotIn("body-secret", logged_output)
+        self.assertIn("request-123", logged_output)
+        self.assertIn("visible", logged_output)
+        self.client.session.request.assert_called_once_with(
+            "POST",
+            "https://jsonplaceholder.typicode.com/items",
+            timeout=10,
+            stream=True,
+            headers=headers,
+            json=request_json,
+        )
+
     def test_post_with_data(self):
         data = {"title": "foo"}
         self.client._request = Mock(return_value={})

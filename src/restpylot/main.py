@@ -4,11 +4,40 @@ import requests
 import tempfile
 import time
 
+from collections.abc import Mapping
 from typing import overload, Optional
 from http.cookiejar import MozillaCookieJar
 from platformdirs import user_cache_dir
 from pathlib import Path
 from urllib.parse import urlsplit
+
+
+def _redact_for_logging(value, key=None):
+    normalized_key = ''.join(char for char in str(key).lower() if char.isalnum()) if key is not None else ''
+    sensitive_key = (
+        normalized_key in {'auth', 'cookies', 'files'}
+        or any(term in normalized_key for term in (
+            'authorization', 'authentication', 'credential', 'password', 'passwd',
+            'secret', 'token', 'cookie', 'apikey'
+        ))
+        or normalized_key.endswith('key')
+    )
+    if sensitive_key:
+        return '*' * len(value)
+    if isinstance(value, Mapping):
+        return {nested_key: _redact_for_logging(nested_value, nested_key)
+                for nested_key, nested_value in value.items()}
+    if isinstance(value, (list, tuple)):
+        redacted_values = []
+        for item in value:
+            if isinstance(item, (list, tuple)) and len(item) == 2 and isinstance(item[0], str):
+                redacted_values.append((item[0], _redact_for_logging(item[1], item[0])))
+            else:
+                redacted_values.append(_redact_for_logging(item))
+        return type(value)(redacted_values)
+    if normalized_key in {'data', 'json', 'params'} and isinstance(value, (str, bytes)):
+        return '*' * len(value)
+    return value
 
 
 class RestClient():
@@ -106,7 +135,9 @@ class RestClient():
         :return: Parsed JSON response or error message
         """
         url = f"{self.base_url}/{endpoint.lstrip('/')}"
-        self.logger.debug(f"Making {method} request to: {url} with kwargs: {kwargs}")
+
+        safe_kwargs = _redact_for_logging(kwargs)
+        self.logger.debug(f"Making {method} request to: {url} with kwargs: {safe_kwargs}")
 
         try:
             with self.session.request(method, url, timeout=self.timeout, stream=True, **kwargs) as response:
